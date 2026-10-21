@@ -1,0 +1,589 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230C1B33'/%3E%3Ccircle cx='32' cy='32' r='16' fill='none' stroke='%237FA4FF' stroke-width='7'/%3E%3C/svg%3E">
+<meta property="og:title" content="Oseru: AI opponent scouting for Jiu-Jitsu">
+<meta property="og:description" content="Turn Jiu-Jitsu match footage into a scouting report and counter-plan for every opponent.">
+<meta property="og:type" content="website">
+<title>Oseru</title>
+<meta name="description" content="Oseru turns Jiu-Jitsu match footage into a scouting report and counter-plan for every opponent.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,700&display=swap">
+<style>
+/* Layout: product-first. A live sample report is the centrepiece; the page reads like a coach's tool, not a deck. */
+:root {
+  --bg: #F4F6F9;
+  --surface: #FFFFFF;
+  --ink: #0C1B33;
+  --muted: #4B5A70;
+  --line: #D9E0EA;
+  --mat: #1F4FD6;
+  --on-mat: #FFFFFF;
+  --mat-soft: #E7EEFC;
+  --deep: #0C1B33;
+  --deep-2: #14274A;
+  --deep-line: #25406E;
+  --deep-ink: #F1F5FB;
+  --deep-muted: #A9B8CF;
+  --deep-accent: #7FA4FF;
+  --seg-half: #1F4FD6;
+  --seg-5050: #9DB8F5;
+  --seg-closed: #D99A1E;
+  --bar-before: #C5CFDD;
+  --display: "Oswald", "Arial Narrow", Arial, sans-serif;
+  --body: "DM Sans", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  --radius: 18px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0A1426; --surface: #101D35; --ink: #EAF0F8; --muted: #9FB0C8; --line: #213457;
+    --mat: #6E97FF; --on-mat: #0A1426; --mat-soft: #132649;
+    --deep: #060E1E; --deep-2: #0E1B33; --deep-line: #22385F; --deep-ink: #EAF0F8; --deep-muted: #A3B3CB; --deep-accent: #7FA4FF;
+    --seg-half: #6E97FF; --seg-5050: #2F5296; --seg-closed: #F2B84B; --bar-before: #33476B;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0A1426; --surface: #101D35; --ink: #EAF0F8; --muted: #9FB0C8; --line: #213457;
+  --mat: #6E97FF; --on-mat: #0A1426; --mat-soft: #132649;
+  --deep: #060E1E; --deep-2: #0E1B33; --deep-line: #22385F; --deep-ink: #EAF0F8; --deep-muted: #A3B3CB; --deep-accent: #7FA4FF;
+  --seg-half: #6E97FF; --seg-5050: #2F5296; --seg-closed: #F2B84B; --bar-before: #33476B;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--body); font-size: 17px; line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 30; background: var(--deep);
+}
+h1, h2, h3, p, ol, ul, figure { margin: 0; }
+h1, h2 { font-family: var(--display); font-weight: 600; line-height: 1.08; text-wrap: balance; }
+h3 { font-size: 1.15rem; line-height: 1.3; text-wrap: balance; }
+a { color: inherit; }
+:focus-visible { outline: 3px solid var(--deep-accent); outline-offset: 3px; border-radius: 6px; }
+
+.wrap {
+  max-width: 1160px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: var(--mat); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  min-height: 48px; padding: 12px 24px; border-radius: 999px;
+  font-weight: 700; font-size: 1rem; text-decoration: none; border: 1px solid transparent;
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+.btn:hover { transform: translateY(-1px); }
+.btn--accent { background: var(--deep-accent); color: var(--deep); }
+.btn--ghost { border-color: var(--deep-line); color: var(--deep-ink); }
+.btn--ghost:hover { background: var(--deep-2); }
+@media (prefers-reduced-motion: reduce) { .btn, .btn:hover { transition: none; transform: none; } }
+
+/* Header */
+.site-header {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20;
+  background: var(--deep); border-bottom: 1px solid var(--deep-line); color: var(--deep-ink);
+}
+.nav { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-block: 14px; }
+.logo { font-family: var(--display); font-weight: 600; font-size: 1.6rem; letter-spacing: 0.18em; text-decoration: none; color: var(--deep-ink); }
+.nav-links { display: flex; align-items: center; gap: 28px; }
+.nav-links a:not(.btn) { color: var(--deep-muted); text-decoration: none; font-size: 0.95rem; }
+.nav-links a:not(.btn):hover { color: var(--deep-ink); }
+@media (max-width: 820px) { .nav-links a:not(.btn) { display: none; } }
+
+/* Hero */
+.hero { background: var(--deep); color: var(--deep-ink); padding-block: clamp(56px, 8vw, 96px); overflow: hidden; }
+.hero-grid { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr); gap: clamp(40px, 6vw, 80px); align-items: center; }
+.hero-copy { display: grid; gap: 26px; }
+.hero h1 { font-size: clamp(2.8rem, 6.2vw, 5rem); }
+.hero h1 em { font-style: normal; color: var(--deep-accent); }
+.lede { font-size: 1.2rem; color: var(--deep-muted); max-width: 50ch; }
+.cta-row { display: flex; flex-wrap: wrap; gap: 14px; }
+.pilot-note { display: flex; align-items: center; gap: 10px; font-size: 0.95rem; color: var(--deep-muted); }
+.pilot-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--deep-accent); flex: none; box-shadow: 0 0 0 5px rgba(127, 164, 255, 0.18); }
+.phone-stage { position: relative; display: grid; justify-items: center; }
+.phone {
+  width: min(300px, 100%); max-width: 100%; aspect-ratio: 576 / 1050; border-radius: 34px; overflow: hidden;
+  border: 8px solid var(--deep-2); box-shadow: 0 40px 80px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--deep-line);
+}
+.phone img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.chip {
+  position: absolute; display: flex; align-items: center; gap: 8px;
+  background: var(--surface); color: var(--ink); border-radius: 999px; padding: 10px 16px;
+  font-size: 0.88rem; font-weight: 700; box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35); white-space: nowrap;
+}
+.chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--mat); flex: none; }
+.chip--a { top: 12%; left: -6%; }
+.chip--b { bottom: 14%; right: -6%; }
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; }
+  .chip--a { left: 0; } .chip--b { right: 0; }
+}
+
+/* Sample report */
+.report-band { padding-block: clamp(72px, 9vw, 112px); }
+.split-head { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px 48px; align-items: end; margin-bottom: 36px; }
+.split-head h2 { font-size: clamp(2.1rem, 4.2vw, 3.3rem); }
+.split-head p { color: var(--muted); font-size: 1.08rem; max-width: 52ch; }
+@media (max-width: 820px) { .split-head { grid-template-columns: 1fr; } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 24px; overflow: hidden; box-shadow: 0 24px 60px rgba(12, 27, 51, 0.08); }
+.panel-bar {
+  display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; align-items: center;
+  padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--bg);
+}
+.panel-bar b { font-size: 1rem; }
+.meta { display: flex; flex-wrap: wrap; gap: 6px 18px; color: var(--muted); font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.status { color: var(--mat); font-weight: 700; }
+.panel-body { padding: 24px; display: grid; gap: 28px; }
+
+.dominant { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; }
+.dominant .big { font-family: var(--display); font-size: clamp(2rem, 4vw, 2.6rem); font-weight: 600; line-height: 1.1; }
+.dominant span { color: var(--muted); }
+
+.timeline { display: grid; gap: 10px; }
+.track { display: flex; height: 34px; border-radius: 10px; overflow: hidden; background: var(--bg); }
+.seg { height: 100%; min-width: 3px; }
+.seg + .seg { border-left: 2px solid var(--surface); }
+.seg--half { background: var(--seg-half); }
+.seg--5050 { background: var(--seg-5050); }
+.seg--closed { background: var(--seg-closed); }
+.ticks { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8rem; font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 22px; font-size: 0.92rem; }
+.legend span { display: inline-flex; align-items: center; gap: 8px; }
+.legend i { width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.legend b { font-variant-numeric: tabular-nums; }
+
+.tabs { display: inline-flex; gap: 4px; padding: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 999px; }
+.tab {
+  min-height: 44px; padding: 8px 22px; border-radius: 999px; border: 0; cursor: pointer;
+  font: inherit; font-weight: 700; color: var(--muted); background: transparent;
+}
+.tab[aria-selected="true"] { background: var(--mat); color: var(--on-mat); }
+.player { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 24px; margin-top: 18px; }
+.player-role { font-weight: 700; font-size: 1.1rem; }
+.player-role span { display: block; font-weight: 500; color: var(--muted); font-size: 0.95rem; }
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+.stats div { background: var(--bg); border-radius: 12px; padding: 12px 6px; text-align: center; }
+.stats b { display: block; font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.stats small { color: var(--muted); font-size: 0.8rem; }
+.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.tags span { background: var(--mat-soft); color: var(--mat); border-radius: 999px; padding: 6px 12px; font-size: 0.85rem; font-weight: 700; }
+.plan { background: var(--bg); border-radius: 16px; padding: 20px; display: grid; gap: 12px; align-content: start; }
+.plan h3 { font-size: 1.12rem; }
+.plan ul { list-style: none; padding: 0; display: grid; gap: 10px; }
+.plan li { display: grid; grid-template-columns: 20px minmax(0, 1fr); gap: 10px; font-size: 0.95rem; color: var(--muted); }
+.plan li svg { width: 18px; height: 18px; margin-top: 3px; color: var(--mat); }
+.sample-note { color: var(--muted); font-size: 0.88rem; margin-top: 16px; }
+@media (max-width: 820px) { .player { grid-template-columns: 1fr; } }
+@media (max-width: 460px) { .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .panel-body, .panel-bar { padding-inline: 16px; } }
+
+/* Coach's week */
+.week-band { background: var(--deep); color: var(--deep-ink); padding-block: clamp(72px, 9vw, 112px); }
+.week-band h2 { font-size: clamp(2.1rem, 4.2vw, 3.3rem); max-width: 18ch; }
+.week-band .label { color: var(--deep-accent); }
+.week-intro { display: grid; gap: 14px; margin-bottom: 48px; }
+.week { list-style: none; padding: 0; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 24px; position: relative; }
+.week::before { content: ""; position: absolute; top: 11px; left: 12px; right: 12px; height: 2px; background: var(--deep-line); }
+.week li { position: relative; display: grid; gap: 8px; padding-top: 44px; min-width: 0; }
+.week li::before {
+  content: ""; position: absolute; top: 0; left: 0; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--deep); border: 3px solid var(--deep-accent);
+}
+.week li:last-child::before { background: var(--deep-accent); }
+.week .when { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; color: var(--deep-accent); }
+.week h3 { font-size: 1.15rem; }
+.week p { color: var(--deep-muted); font-size: 0.95rem; }
+@media (max-width: 860px) {
+  .week { grid-template-columns: 1fr; gap: 28px; }
+  .week::before { top: 12px; bottom: 12px; left: 11px; right: auto; width: 2px; height: auto; }
+  .week li { padding-top: 0; padding-left: 48px; }
+}
+
+/* Technology */
+.tech-band { padding-block: clamp(72px, 9vw, 112px); }
+.tech-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(32px, 5vw, 64px); align-items: center; }
+.tech-copy { display: grid; gap: 18px; }
+.tech-copy h2 { font-size: clamp(2.1rem, 4.2vw, 3.3rem); }
+.tech-copy > p { color: var(--muted); font-size: 1.08rem; }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.flow span { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 8px 14px; font-size: 0.9rem; font-weight: 700; }
+.flow svg { width: 16px; height: 16px; color: var(--muted); flex: none; }
+.tracked { position: relative; border-radius: 22px; overflow: hidden; border: 1px solid var(--line); aspect-ratio: 8 / 9; max-width: 100%; }
+.tracked img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.scan {
+  position: absolute; left: 0; right: 0; top: 8%; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--deep-accent), transparent);
+  box-shadow: 0 0 14px 2px rgba(127, 164, 255, 0.55); animation: scan 5s ease-in-out infinite;
+}
+@keyframes scan { 0%, 100% { top: 8%; } 50% { top: 90%; } }
+@media (prefers-reduced-motion: reduce) { .scan { display: none; } }
+@media (max-width: 860px) { .tech-grid { grid-template-columns: 1fr; } .tracked { max-width: 440px; } }
+
+.results { margin-top: clamp(48px, 6vw, 72px); display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr); gap: 24px; }
+.result-big { background: var(--deep); color: var(--deep-ink); border-radius: 22px; padding: 32px; display: grid; gap: 8px; align-content: center; }
+.result-big b { font-family: var(--display); font-weight: 600; font-size: clamp(3.6rem, 7vw, 5rem); line-height: 1; color: var(--deep-accent); font-variant-numeric: tabular-nums; }
+.result-big span { color: var(--deep-muted); }
+.chart { background: var(--surface); border: 1px solid var(--line); border-radius: 22px; padding: 28px; display: grid; gap: 18px; }
+.chart h3 { font-size: 1.1rem; }
+.chart > p { color: var(--muted); font-size: 0.95rem; margin-top: -10px; }
+.bars { display: grid; gap: 18px; }
+.bar-group { display: grid; gap: 6px; }
+.bar-group > b { font-size: 0.95rem; }
+.bar-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) 64px; gap: 10px; align-items: center; font-size: 0.85rem; color: var(--muted); }
+.bar-row .val { text-align: right; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.bar-track { height: 14px; border-radius: 7px; background: var(--bg); overflow: hidden; }
+.bar { height: 100%; border-radius: 7px; }
+.bar--before { background: var(--bar-before); }
+.bar--after { background: var(--mat); }
+.axis { display: grid; grid-template-columns: 56px minmax(0, 1fr) 64px; gap: 10px; font-size: 0.78rem; color: var(--muted); }
+.axis div { display: flex; justify-content: space-between; font-variant-numeric: tabular-nums; }
+@media (max-width: 820px) { .results { grid-template-columns: 1fr; } }
+
+.adapt { margin-top: 24px; display: grid; gap: 10px; }
+.adapt img { width: 100%; max-width: 100%; height: auto; aspect-ratio: 1800 / 506; object-fit: cover; border-radius: 18px; border: 1px solid var(--line); }
+.adapt figcaption { color: var(--muted); font-size: 0.92rem; }
+
+/* Audience + founder */
+.people { background: var(--surface); border-block: 1px solid var(--line); padding-block: clamp(72px, 9vw, 104px); }
+.people-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(40px, 6vw, 80px); }
+.for h2, .founder h2 { font-size: clamp(1.9rem, 3.4vw, 2.6rem); margin-bottom: 22px; }
+.for ul { list-style: none; padding: 0; display: grid; }
+.for li { display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 16px; padding-block: 18px; border-top: 1px solid var(--line); }
+.for li:last-child { border-bottom: 1px solid var(--line); }
+.for li b { color: var(--mat); }
+.for li span { color: var(--muted); }
+.founder p { color: var(--muted); font-size: 1.05rem; max-width: 56ch; }
+.founder p + p { margin-top: 14px; }
+.founder .sig { margin-top: 22px; display: grid; gap: 2px; }
+.founder .sig b { font-size: 1.1rem; color: var(--ink); }
+.founder .sig span { color: var(--muted); font-size: 0.95rem; }
+@media (max-width: 860px) { .people-grid { grid-template-columns: 1fr; } }
+@media (max-width: 460px) { .for li { grid-template-columns: 1fr; gap: 4px; } }
+
+/* Contact */
+.contact { background: var(--deep); color: var(--deep-ink); padding-block: clamp(72px, 9vw, 104px); }
+.contact-grid { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 32px; align-items: center; }
+.contact h2 { font-size: clamp(2.1rem, 4.2vw, 3.3rem); }
+.contact-copy p { font-size: 1.1rem; margin-top: 14px; color: var(--deep-muted); max-width: 50ch; }
+.email-box { background: var(--surface); color: var(--ink); border-radius: 22px; padding: 26px; display: grid; gap: 14px; }
+.email-box label { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }
+.email-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.email-row input {
+  flex: 1 1 220px; min-width: 0; font: inherit; font-weight: 700; font-size: 1.05rem; color: var(--ink);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+}
+.copy-btn { min-height: 48px; padding: 10px 20px; border-radius: 12px; border: 0; cursor: pointer; background: var(--mat); color: var(--on-mat); font: inherit; font-weight: 700; }
+.email-hint { font-size: 0.9rem; color: var(--muted); }
+.email-hint a { color: var(--mat); font-weight: 700; }
+@media (max-width: 820px) { .contact-grid { grid-template-columns: 1fr; } }
+
+.site-footer { background: var(--deep); color: var(--deep-muted); padding-block: 28px; font-size: 0.92rem; border-top: 1px solid var(--deep-line); }
+.footer-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px 24px; align-items: center; }
+.footer-row .logo { font-size: 1.2rem; }
+
+/* Base reset for the standalone site */
+html, body { margin: 0; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="wrap nav">
+    <a class="logo" href="#top">OSERU</a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#report">Sample report</a>
+      <a href="#week">How coaches use it</a>
+      <a href="#technology">Technology</a>
+      <a class="btn btn--accent" href="#contact">Request a demo</a>
+    </nav>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <h1>Know your opponent <em>before</em> you step on the mat.</h1>
+        <p class="lede">Oseru analyzes Jiu-Jitsu match video and gives coaches a scouting report and a counter-plan for every opponent in the bracket.</p>
+        <div class="cta-row">
+          <a class="btn btn--accent" href="#report">See a real report</a>
+          <a class="btn btn--ghost" href="#contact">Request a demo</a>
+        </div>
+        <p class="pilot-note"><span class="pilot-dot" aria-hidden="true"></span>Piloting with the Palestinian Jiu-Jitsu Federation</p>
+      </div>
+      <div class="phone-stage">
+        <div class="phone"><img src="img/screen-counter.png" width="576" height="1050" alt="Oseru app screen showing a player's style statistics and an automatic counter-plan"></div>
+        <span class="chip chip--a"><i aria-hidden="true"></i>448 frames analyzed</span>
+        <span class="chip chip--b"><i aria-hidden="true"></i>Counter-plan ready</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="report-band" id="report">
+    <div class="wrap">
+      <div class="split-head">
+        <div><p class="label">Sample report</p><h2>A real report from a real match</h2></div>
+        <p>This is what a coach gets after uploading one sparring video. Switch between the two players to see how each one plays and how to beat them.</p>
+      </div>
+
+      <div class="panel">
+        <div class="panel-bar">
+          <b>Match analysis</b>
+          <div class="meta"><span>448 frames</span><span>14.9 s of video</span><span>High reliability</span><span class="status">Completed</span></div>
+        </div>
+        <div class="panel-body">
+          <div class="dominant">
+            <span class="label">Dominant position</span>
+            <span class="big">Half guard</span>
+            <span>75.9% of analyzed frames</span>
+          </div>
+
+          <div class="timeline" role="img" aria-label="Match timeline: half guard frames 0 to 17, closed guard frame 18, half guard 19 to 218, closed guard frame 219, half guard 220 to 341, 50/50 guard 342 to 447">
+            <div class="track">
+              <div class="seg seg--half" style="width: 4.02%"></div>
+              <div class="seg seg--closed" style="width: 0.22%"></div>
+              <div class="seg seg--half" style="width: 44.64%"></div>
+              <div class="seg seg--closed" style="width: 0.22%"></div>
+              <div class="seg seg--half" style="width: 27.23%"></div>
+              <div class="seg seg--5050" style="width: 23.66%"></div>
+            </div>
+            <div class="ticks"><span>Frame 0</span><span>224</span><span>447</span></div>
+          </div>
+          <div class="legend">
+            <span><i class="seg--half" aria-hidden="true"></i>Half guard <b>75.9%</b></span>
+            <span><i class="seg--5050" aria-hidden="true"></i>50/50 guard <b>23.7%</b></span>
+            <span><i class="seg--closed" aria-hidden="true"></i>Closed guard <b>0.4%</b></span>
+          </div>
+
+          <div>
+            <div class="tabs" role="tablist" aria-label="Choose a player">
+              <button class="tab" type="button" role="tab" id="tab-p1" aria-controls="panel-p1" aria-selected="false" tabindex="-1">Player 1</button>
+              <button class="tab" type="button" role="tab" id="tab-p2" aria-controls="panel-p2" aria-selected="true">Player 2</button>
+            </div>
+
+            <div class="player" role="tabpanel" id="panel-p1" aria-labelledby="tab-p1" hidden>
+              <div>
+                <p class="player-role">Player 1<span>Guard passer (half guard passer)</span></p>
+                <div class="stats">
+                  <div><b>32.6%</b><small>Guard</small></div>
+                  <div><b>43.8%</b><small>Top</small></div>
+                  <div><b>0.0%</b><small>Turtle</small></div>
+                  <div><b>0.0%</b><small>Finish</small></div>
+                </div>
+                <div class="tags"><span>recycles exchanges through recovery loops</span><span>plays half guard</span><span>50/50 involvement</span></div>
+              </div>
+              <div class="plan">
+                <p class="label">Counter-plan</p>
+                <h3>Deny their half guard pass and steer them into a guard they finish less often</h3>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg><span>They pass half guard most (43.5% of top time, 0.0% reach control). Fight for the underhook and knee-shield early so they cannot clear your knee-line.</span></li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg><span>They spend 23.7% in 50/50. Clear your knee-line early and avoid stalling in equal leg positions.</span></li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="player" role="tabpanel" id="panel-p2" aria-labelledby="tab-p2">
+              <div>
+                <p class="player-role">Player 2<span>Guard player (half guard bottom)</span></p>
+                <div class="stats">
+                  <div><b>43.8%</b><small>Guard</small></div>
+                  <div><b>32.6%</b><small>Top</small></div>
+                  <div><b>0.0%</b><small>Turtle</small></div>
+                  <div><b>0.0%</b><small>Finish</small></div>
+                </div>
+                <div class="tags"><span>recycles exchanges through recovery loops</span><span>passes half guard</span><span>50/50 involvement</span></div>
+              </div>
+              <div class="plan">
+                <p class="label">Counter-plan</p>
+                <h3>Structured passing that clears their half guard and denies the recovery</h3>
+                <ul>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg><span>They play half guard 43.5% of bottom time. Control the inside knee and head, clear the knee-line, then flatten before settling chest pressure.</span></li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg><span>They sweep or wrestle up from half guard 96.1% of the time. Kill the underhook and keep your weight back before passing.</span></li>
+                  <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg><span>They spend 23.7% in 50/50. Clear your knee-line early and avoid stalling in equal leg positions.</span></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="sample-note">Figures and counter-plans are the app's real output for a 14.9-second sparring clip.</p>
+    </div>
+  </section>
+
+  <section class="week-band" id="week">
+    <div class="wrap">
+      <div class="week-intro">
+        <p class="label">How coaches use it</p>
+        <h2>A coach's week before a tournament</h2>
+      </div>
+      <ol class="week">
+        <li><span class="when">Entry list is out</span><h3>30+ potential opponents</h3><p>Every name in the division has a different game, and you can't watch hours of video on each.</p></li>
+        <li><span class="when">Same day</span><h3>Upload their matches</h3><p>Video from any phone or past competition footage. No special cameras.</p></li>
+        <li><span class="when">Reports arrive</span><h3>One report per opponent</h3><p>Dominant positions, habits and a counter-plan, ready to share with your athlete.</p></li>
+        <li><span class="when">Training days</span><h3>Drill the plan</h3><p>Build sessions around the exact positions your athlete will face.</p></li>
+        <li><span class="when">Match day</span><h3>Compete with a plan</h3><p>Your athlete walks in knowing what the opponent does and how to shut it down.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="tech-band" id="technology">
+    <div class="wrap">
+      <div class="tech-grid">
+        <div class="tech-copy">
+          <p class="label">Technology</p>
+          <h2>Built to read grappling, where bodies overlap</h2>
+          <p>Two athletes tangled on the mat is one of the hardest scenes for computer vision. Oseru combines several models so each one does the job it is best at.</p>
+          <div class="flow" aria-label="Pipeline: person tracking, pose estimation, position model, temporal smoothing, style engine">
+            <span>Person tracking</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <span>Pose (ViTPose)</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <span>Positions (YOLOv8)</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <span>Smoothing</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            <span>Style engine</span>
+          </div>
+        </div>
+        <div class="tracked">
+          <img src="img/cover.jpg" width="960" height="1080" alt="Two athletes on the mat, each tracked by an AI detection box and pose skeleton labelled P1 and P2">
+          <div class="scan" aria-hidden="true"></div>
+        </div>
+      </div>
+
+      <div class="results">
+        <div class="result-big">
+          <b>98.3%</b>
+          <span>position accuracy on held-out test data across 18 Jiu-Jitsu positions</span>
+        </div>
+        <div class="chart">
+          <h3>It adapts to a new gym by itself</h3>
+          <p>Accuracy on footage from a new gym, before and after self-adaptation. Zero frames were labelled by hand.</p>
+          <div class="bars">
+            <div class="bar-group">
+              <b>Back control</b>
+              <div class="bar-row"><span>Before</span><div class="bar-track"><div class="bar bar--before" style="width: 5.7%"></div></div><span class="val">5.7%</span></div>
+              <div class="bar-row"><span>After</span><div class="bar-track"><div class="bar bar--after" style="width: 96.5%"></div></div><span class="val">96.5%</span></div>
+            </div>
+            <div class="bar-group">
+              <b>50/50 guard</b>
+              <div class="bar-row"><span>Before</span><div class="bar-track"><div class="bar bar--before" style="width: 35.1%"></div></div><span class="val">35.1%</span></div>
+              <div class="bar-row"><span>After</span><div class="bar-track"><div class="bar bar--after" style="width: 100%"></div></div><span class="val">100%</span></div>
+            </div>
+          </div>
+          <div class="axis" aria-hidden="true"><span></span><div><span>0%</span><span>50%</span><span>100%</span></div><span></span></div>
+        </div>
+      </div>
+
+      <figure class="adapt">
+        <img src="img/before-after.jpg" width="1800" height="506" alt="Two frames side by side: before adaptation the model labels back control as closed guard; after adaptation it labels it correctly as back control">
+        <figcaption>Before adaptation, back control is misread as closed guard. After retraining on the gym's own clips, labelled automatically, the model gets it right.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="people">
+    <div class="wrap people-grid">
+      <div class="for">
+        <h2>Who it's for</h2>
+        <ul>
+          <li><b>Federations</b><span>One annual license covers your national team's coaches and athletes for the whole season.</span></li>
+          <li><b>Clubs</b><span>Prepare your competition team for every bracket and plan training around real match data.</span></li>
+          <li><b>Coaches &amp; athletes</b><span>Self-serve opponent analysis around your own competition calendar.</span></li>
+        </ul>
+      </div>
+      <div class="founder">
+        <h2>Built by a competitor</h2>
+        <p>I'm a Jiu-Jitsu black belt who competes for Palestine internationally, including at the 2026 Asian Games. I've walked into matches knowing nothing about my opponent beyond a name on the bracket.</p>
+        <p>I'm also a computer engineer from Birzeit University, and I built Oseru's AI and app myself. I own and run Al-Nukhba club, so I see the coaching side of this problem every week.</p>
+        <div class="sig"><b>Mohammad Hazem Ajaj</b><span>Founder · Ramallah, Palestine</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <div class="wrap contact-grid">
+      <div class="contact-copy">
+        <p class="label" style="color: var(--deep-accent)">Pilot program</p>
+        <h2>Try Oseru on your own footage</h2>
+        <p>We're onboarding our first federations and clubs. Send us a few matches and we'll walk you through a live scouting report.</p>
+      </div>
+      <div class="email-box">
+        <label for="contact-email">Email the founder</label>
+        <div class="email-row">
+          <input id="contact-email" type="text" value="mohammadhazem985@gmail.com" readonly>
+          <button class="copy-btn" id="copy-email" type="button">Copy</button>
+        </div>
+        <p class="email-hint" id="copy-status" aria-live="polite">Or <a href="mailto:mohammadhazem985@gmail.com?subject=Oseru%20demo%20request">open your email app</a>.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap footer-row">
+    <a class="logo" href="#top">OSERU</a>
+    <span>AI opponent scouting for Jiu-Jitsu · Ramallah, Palestine · © 2026</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab'));
+  function select(tab) {
+    tabs.forEach(function (t) {
+      var on = t === tab;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      var panel = document.getElementById(t.getAttribute('aria-controls'));
+      if (panel) panel.hidden = !on;
+    });
+  }
+  tabs.forEach(function (t, i) {
+    t.addEventListener('click', function () { select(t); });
+    t.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        var next = tabs[(i + (e.key === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length];
+        select(next); next.focus();
+      }
+    });
+  });
+
+  var btn = document.getElementById('copy-email');
+  var input = document.getElementById('contact-email');
+  var status = document.getElementById('copy-status');
+  if (btn && input) {
+    btn.addEventListener('click', function () {
+      function fallback() {
+        input.focus(); input.select();
+        status.textContent = 'Selected. Press Ctrl+C (or Cmd+C) to copy.';
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(function () {
+          btn.textContent = 'Copied';
+          status.textContent = 'Email address copied.';
+          setTimeout(function () { btn.textContent = 'Copy'; }, 2000);
+        }, fallback);
+      } else { fallback(); }
+    });
+  }
+})();
+</script>
+</body>
+</html>
